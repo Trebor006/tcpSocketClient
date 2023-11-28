@@ -232,14 +232,16 @@ public class WebSocketClient extends Thread {
             sleepClient(100);
             out.println(localFile.getName());
             sleepClient(100);
+            out.println(localFile.length());
+            sleepClient(100);
 
             byte[] byteArray = new byte[8192];
             int readByteArray;
             while ((readByteArray = bis.read(byteArray)) != -1) {
                 bos.write(byteArray, 0, readByteArray);
             }
+            bos.flush();
             bis.close();
-
             sleepClient(100);
             String log = "Archivo enviado " + filePath;
             this.notifyEventClient(log);
