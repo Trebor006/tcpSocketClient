@@ -73,8 +73,8 @@ public class WebSocketClient extends Thread {
 
     public void startClient(String serverAddress, int serverPort, String userName) {
         try {
-            this.serverAddress = serverAddress;
-            this.serverPort = serverPort;
+//            this.serverAddress = serverAddress;
+//            this.serverPort = serverPort;
             this.started = true;
             this.clients = new HashMap<>();
             this.userName = userName;
