@@ -2,6 +2,9 @@ package com.fldsmdfr;
 
 import org.json.JSONObject;
 
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 public class FileInformation {
@@ -49,7 +52,15 @@ public class FileInformation {
         json.put("filePathClient", this.filePathClient);
         json.put("filePathServer", this.filePathServer);
         if(this.dataPart != null) {
-            json.put("dataPart", new String(this.dataPart, StandardCharsets.UTF_8));
+            Charset utf8charset = StandardCharsets.UTF_8;
+            Charset iso88591charset = StandardCharsets.ISO_8859_1;
+            ByteBuffer inputBuffer = ByteBuffer.wrap(this.dataPart);
+            // decode UTF-8
+            CharBuffer data = iso88591charset.decode(inputBuffer);
+            // encode ISO-8559-1
+            ByteBuffer outputBuffer = utf8charset.encode(data);
+            byte[] outputData = outputBuffer.array();
+            json.put("dataPart", new String(outputData, StandardCharsets.UTF_8));
         }
         return json.toString();
     }
@@ -66,7 +77,17 @@ public class FileInformation {
         this.filePathClient = json.getString("filePathClient");
         this.filePathServer = json.getString("filePathServer");
         if(json.has("dataPart") && !json.isNull("dataPart")) {
-            this.dataPart = json.getString("dataPart").getBytes(StandardCharsets.UTF_8);
+            byte[] inputByte =  json.getString("dataPart").getBytes(StandardCharsets.UTF_8);
+            Charset utf8charset = StandardCharsets.UTF_8;
+            Charset iso88591charset = StandardCharsets.ISO_8859_1;
+            ByteBuffer inputBuffer = ByteBuffer.wrap(inputByte);
+            // decode UTF-8
+            CharBuffer data = utf8charset.decode(inputBuffer);
+            // encode ISO-8559-1
+            ByteBuffer outputBuffer =iso88591charset .encode(data);
+            byte[] outputData = outputBuffer.array();
+
+            this.dataPart = outputData;
         } else {
             this.dataPart = null;
         }
