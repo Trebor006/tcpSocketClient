@@ -6,7 +6,7 @@ import java.io.RandomAccessFile;
 public class FileTransfer {
     //static CopyOnWriteArrayList<FileInformation> colaTransferencia =  new CopyOnWriteArrayList<>();
 
-    public static final int PART_SIZE = 1024;
+    public static final int PART_SIZE = 1024*4;
 
     public static FileInformation readPart(FileInformation fileInformation) throws IOException {
         FileInformation fileInformationSend =  cloneFileInformation(fileInformation);
