@@ -1,16 +1,16 @@
 package com.fldsmdfr;
 
-import com.fldsmdfr.event.EventClient;
-import com.fldsmdfr.event.EventClientManager;
+import com.fldsmdfr.event.*;
 import org.json.JSONObject;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Scanner;
 
-public class WebSocketClient extends Thread {
+public class WebSocketClient extends Thread implements EventProcessPackageListener {
 
     private String serverAddress;
     private int serverPort;
@@ -30,17 +30,13 @@ public class WebSocketClient extends Thread {
     private BufferedOutputStream bos;
     private volatile boolean started;
 
-    private static final String ACTION_USERNAME = "USERNAME";
-    private static final String ACTION_CONNECT_CLIENT = "CONNECT_CLIENT";
-    private static final String ACTION_DISCONNECT_CLIENT = "DISCONNECT_CLIENT";
-    private static final String ACTION_LIST_CLIENTS = "LIST_CLIENTS";
-    private static final String ACTION_MESSAGE = "MESSAGE";
-    private static final String ACTION_FILE = "FILE";
-
+    private EventProcessPackageManager eventProcessPackageManager; // Notificaciones del Package Handlar al Manejador de conecciones
     private EventClientManager eventClientManager; // Notificacion a la vista
 
     public WebSocketClient() {
         this.started = false;
+        eventProcessPackageManager = new EventProcessPackageManager();
+        eventProcessPackageManager.addEventListener(this);
     }
 
     public String getServerAddress() {
@@ -102,11 +98,26 @@ public class WebSocketClient extends Thread {
 
     public void stopClient() {
         this.started = false;
-        try{this.out.close();} catch (Exception ignored) {}
-        try{this.in.close();} catch (Exception ignored) {}
-        try{this.dis.close();} catch (Exception ignored) {}
-        try{this.dout.close();} catch (Exception ignored) {}
-        try{this.bos.close();} catch (Exception ignored) {}
+        try {
+            this.out.close();
+        } catch (Exception ignored) {
+        }
+        try {
+            this.in.close();
+        } catch (Exception ignored) {
+        }
+        try {
+            this.dis.close();
+        } catch (Exception ignored) {
+        }
+        try {
+            this.dout.close();
+        } catch (Exception ignored) {
+        }
+        try {
+            this.bos.close();
+        } catch (Exception ignored) {
+        }
         // todo falta liberar recursos
         String log = "Desconectado del server " + this.serverAddress + ":" + this.serverPort + " {id: " + this.id + " - userName: " + this.userName + "}";
         this.notifyEventClient(log);
@@ -117,8 +128,12 @@ public class WebSocketClient extends Thread {
     public void run() {
         try {
             while (this.started) {
-                String action = this.in.readLine();
-                this.executeAction(action);
+                //String action = this.in.readLine();
+//                this.executeAction(action);
+                String data = dis.readUTF();
+                PackageHandler packageHandler = new PackageHandler(data, this.eventProcessPackageManager);
+                packageHandler.start();
+
             }
 
         } catch (IOException e) {
@@ -129,126 +144,83 @@ public class WebSocketClient extends Thread {
 
     private void executeAction(String action) {
         System.out.println("Accion recibida: " + action);
-        switch (action) {
-            case ACTION_USERNAME: {
-                sendUserName();
-                break;
-            }
-            case ACTION_MESSAGE: {
-                try {
-                    String source = this.in.readLine();
-                    String message = this.in.readLine();
-                    System.out.println("source: " + source);
-                    System.out.println("message: " + message);
-                    JSONObject data = new JSONObject();
-                    data.put("action", ACTION_MESSAGE);
-                    data.put("id", this.id);
-                    data.put("source", source);
-                    data.put("target", id);
-                    data.put("message", message);
-                    this.notifyEventClient(data.toString());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+    }
 
-                break;
-            }
-            case ACTION_LIST_CLIENTS: {
-                try {
-                    String listClients = this.in.readLine();
-                    System.out.println("clientes: " + listClients);
-                    JSONObject jsonClients = new JSONObject(listClients);
-                    Iterator<String> keys = jsonClients.keys();
-                    clients = new HashMap<>();
-                    while (keys.hasNext()) {
-                        String idCliente = keys.next();
-                        clients.put(idCliente, jsonClients.getString(idCliente));
-                    }
-                    JSONObject data = new JSONObject();
-                    data.put("action", ACTION_LIST_CLIENTS);
-                    data.put("id", this.id);
-                    data.put("clients", listClients);
-                    this.notifyEventClient(data.toString());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                break;
-            }
-            case ACTION_CONNECT_CLIENT: {
-                try {
-                    String clientIdNew = this.in.readLine();
-                    String clientUserNameNew = this.in.readLine();
-                    String log =  "clientNew: " + clientIdNew + " - " + clientUserNameNew;
-                    System.out.println(log);
-                    clients.put(clientIdNew, clientUserNameNew);
-                    this.notifyEventClient(log);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                break;
-            }
-            case ACTION_DISCONNECT_CLIENT: {
-                try {
-                    String clientId = this.in.readLine();
-                    String log = "clientDisconect: " + clientId;
-                    System.out.println(log);
-                    clients.remove(clientId);
-                    this.notifyEventClient(log);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                break;
-            }
+    public synchronized void send(String data) {
+        try {
+            this.dout.writeUTF(data);
+            this.dout.flush();
+            sleepClient(100);
+        } catch (IOException ex) {
+            System.err.println(WebSocketHandler.class.getName() + ex.getMessage());
         }
     }
 
-
     private void sendUserName() {
+        DataPackage dataPackage = new DataPackage(this.id, "server", this.userName, Protocol.ACTION_USERNAME);
+        send(dataPackage.toString());
         System.out.println("Enviando USERNAME: " + this.userName);
-        out.println(ACTION_USERNAME);
-        sleepClient(100);
-        out.println(this.userName);
+//        out.println(ACTION_USERNAME);
+//        sleepClient(100);
+//        out.println(this.userName);
     }
 
     public void sendMessage(String target, String message) {
-        System.out.println("Enviando MENSAJE a " + target + ": " + message);
-        out.println(ACTION_MESSAGE);
-        sleepClient(100);
-        out.println(target);
-        sleepClient(100);
-        out.println(message);
+        DataPackage dataPackage = new DataPackage(this.id, target, message, Protocol.ACTION_MESSAGE);
+        send(dataPackage.toString());
+//        System.out.println("Enviando MENSAJE a " + target + ": " + message);
+//        out.println(ACTION_MESSAGE);
+//        sleepClient(100);
+//        out.println(target);
+//        sleepClient(100);
+//        out.println(message);
     }
 
     public void sendFile(String target, String filePath) {
         final File localFile = new File(filePath);
-        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(localFile))) {
-            System.out.println("Enviando File a " + target + ": " + filePath);
-            out.println(ACTION_FILE);
-            sleepClient(100);
-            out.println(target);
-            sleepClient(100);
-            out.println(localFile.getName());
-            sleepClient(100);
-            out.println(localFile.length());
-            sleepClient(100);
-
-            byte[] byteArray = new byte[8192];
-            int readByteArray;
-            while ((readByteArray = bis.read(byteArray)) != -1) {
-                bos.write(byteArray, 0, readByteArray);
-            }
-            bos.flush();
-            bis.close();
-            sleepClient(100);
-            String log = "Archivo enviado " + filePath;
-            this.notifyEventClient(log);
-        } catch (IOException e) {
-            String log = "Error al enviar el archivo " + filePath;
-            this.notifyEventClient(log);
+        FileInformation fileInformation = new FileInformation();
+        fileInformation.idClient =  String.valueOf(new Date().getTime());
+        fileInformation.filePathClient =  filePath;
+        fileInformation.name =  localFile.getName();
+        fileInformation.size =  localFile.length();
+        fileInformation.partNumber = 0;
+        int partsTotal = (int) (fileInformation.size / FileTransfer.PART_SIZE);
+        if(fileInformation.size % FileTransfer.PART_SIZE != 0) {
+            partsTotal++;
         }
+        fileInformation.partsTotal = partsTotal;
+        //FileTransfer.colaTransferencia.add(fileInformation);
+
+        DataPackage dataPackage = new DataPackage(id, "server", fileInformation.toString(), Protocol.ACTION_FILE);
+        send(dataPackage.toString());
+        this.notifyEventClient("Enviando Cabecera " + fileInformation.name + " " + "Parte " + fileInformation.partNumber + " de " + fileInformation.partsTotal + " | " + fileInformation.sizePart + " bytes a enviar " + " | " + fileInformation.sizeSend + " bytes en el server " + " | " + fileInformation.size + " bytes totales");
+        this.notifyEventClient(dataPackage.toString());
+
+//        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(localFile))) {
+//            System.out.println("Enviando File a " + target + ": " + filePath);
+//            out.println(ACTION_FILE);
+//            sleepClient(100);
+//            out.println(target);
+//            sleepClient(100);
+//            out.println(localFile.getName());
+//            sleepClient(100);
+//            out.println(localFile.length());
+//            sleepClient(100);
+//
+//            byte[] byteArray = new byte[8192];
+//            int readByteArray;
+//            while ((readByteArray = bis.read(byteArray)) != -1) {
+//                bos.write(byteArray, 0, readByteArray);
+//            }
+//            bos.flush();
+//            bis.close();
+//            sleepClient(100);
+//            String log = "Archivo enviado " + filePath;
+//            this.notifyEventClient(log);
+//        } catch (IOException e) {
+//            String log = "Error al enviar el archivo " + filePath;
+//            this.notifyEventClient(log);
+//        }
     }
 
     private void sleepClient(int sleep) {
@@ -267,6 +239,67 @@ public class WebSocketClient extends Thread {
         data.put("isStarted", this.started);
         data.put("log", log);
         eventClientManager.fireEventServer(new EventClient(this, data));
+    }
+
+    @Override
+    public void eventProcessPackageOccurred(EventProcessPackage evt) {
+        DataPackage dataPackage = evt.getData();
+        switch (dataPackage.getAction()) {
+            case Protocol.ACTION_USERNAME: {
+                sendUserName();
+                break;
+            }
+            case Protocol.ACTION_MESSAGE: {
+                this.notifyEventClient(dataPackage.toString());
+                break;
+            }
+            case Protocol.ACTION_LIST_CLIENTS: {
+                String listClients = dataPackage.getData();
+                System.out.println("clientes: " + listClients);
+                JSONObject jsonClients = new JSONObject(listClients);
+                Iterator<String> keys = jsonClients.keys();
+                clients = new HashMap<>();
+                while (keys.hasNext()) {
+                    String idCliente = keys.next();
+                    clients.put(idCliente, jsonClients.getString(idCliente));
+                }
+                this.notifyEventClient(dataPackage.toString());
+
+                break;
+            }
+            case Protocol.ACTION_CONNECT_CLIENT: {
+                JSONObject data =  new JSONObject(dataPackage.getData());
+                String clientIdNew = data.getString("id");
+                String clientUserNameNew = data.getString("userName");
+                String log = "clientNew: " + clientIdNew + " - " + clientUserNameNew;
+                System.out.println(log);
+                clients.put(clientIdNew, clientUserNameNew);
+                this.notifyEventClient(log);
+
+                break;
+            }
+            case Protocol.ACTION_DISCONNECT_CLIENT: {
+                String clientId = dataPackage.getData();
+                String log = "clientDisconect: " + clientId;
+                System.out.println(log);
+                clients.remove(clientId);
+                this.notifyEventClient(log);
+                break;
+            }
+            case Protocol.ACTION_FILE_PART: {
+                FileInformation fileInformation = new FileInformation();
+                fileInformation.toFileInformation(new JSONObject(dataPackage.getData()));
+                this.notifyEventClient("Enviando Pate " + fileInformation.name + " " + "Parte " + fileInformation.partNumber + " de " + fileInformation.partsTotal + " | " + fileInformation.sizePart + " bytes a enviar " + " | " + fileInformation.sizeSend + " bytes en el server " + " | " + fileInformation.size + " bytes totales");
+                send(dataPackage.toString());
+                break;
+            }
+            case Protocol.ACTION_FILE_END: {
+                FileInformation fileInformation = new FileInformation();
+                fileInformation.toFileInformation(new JSONObject(dataPackage.getData()));
+                this.notifyEventClient("Termino de enviar " + fileInformation.name + " " + "Parte " + fileInformation.partNumber + " de " + fileInformation.partsTotal + " | " + fileInformation.sizePart + " bytes a enviar " + " | " + fileInformation.sizeSend + " bytes en el server " + " | " + fileInformation.size + " bytes totales");
+                break;
+            }
+        }
     }
 
 
@@ -335,4 +368,6 @@ public class WebSocketClient extends Thread {
 //            e.printStackTrace();
 //        }
     }
+
+
 }
