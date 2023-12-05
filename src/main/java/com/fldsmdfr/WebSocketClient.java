@@ -152,12 +152,14 @@ public class WebSocketClient extends Thread implements EventProcessPackageListen
             this.dout.flush();
             sleepClient(100);
         } catch (IOException ex) {
-            System.err.println(WebSocketHandler.class.getName() + ex.getMessage());
+            System.out.println(data);
+            ex.printStackTrace();
+            System.err.println(WebSocketClient.class.getName() + ex.getMessage());
         }
     }
 
     private void sendUserName() {
-        DataPackage dataPackage = new DataPackage(this.id, "server", this.userName, Protocol.ACTION_USERNAME);
+        DataPackage dataPackage = new DataPackage(this.id, "server", this.userName, Protocol.ACTION_USERNAME, null);
         send(dataPackage.toString());
         System.out.println("Enviando USERNAME: " + this.userName);
 //        out.println(ACTION_USERNAME);
@@ -166,7 +168,7 @@ public class WebSocketClient extends Thread implements EventProcessPackageListen
     }
 
     public void sendMessage(String target, String message) {
-        DataPackage dataPackage = new DataPackage(this.id, target, message, Protocol.ACTION_MESSAGE);
+        DataPackage dataPackage = new DataPackage(this.id, target, message, Protocol.ACTION_MESSAGE, null);
         send(dataPackage.toString());
 //        System.out.println("Enviando MENSAJE a " + target + ": " + message);
 //        out.println(ACTION_MESSAGE);
@@ -191,7 +193,7 @@ public class WebSocketClient extends Thread implements EventProcessPackageListen
         fileInformation.partsTotal = partsTotal;
         //FileTransfer.colaTransferencia.add(fileInformation);
 
-        DataPackage dataPackage = new DataPackage(id, "server", fileInformation.toString(), Protocol.ACTION_FILE);
+        DataPackage dataPackage = new DataPackage(id, "server", fileInformation.toString(), Protocol.ACTION_FILE, null);
         send(dataPackage.toString());
         this.notifyEventClient("Enviando Cabecera " + fileInformation.name + " " + "Parte " + fileInformation.partNumber + " de " + fileInformation.partsTotal + " | " + fileInformation.sizePart + " bytes a enviar " + " | " + fileInformation.sizeSend + " bytes en el server " + " | " + fileInformation.size + " bytes totales");
         this.notifyEventClient(dataPackage.toString());

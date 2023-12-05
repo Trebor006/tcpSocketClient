@@ -50,7 +50,7 @@ public class PackageHandler extends Thread {
                     FileInformation fileInformation = new FileInformation();
                     fileInformation.toFileInformation(new JSONObject(dataPackage.getData()));
                     FileInformation fileInformationOut = FileTransfer.readPart(fileInformation);
-                    DataPackage dataPackageSend = new DataPackage(dataPackage.getSource(), dataPackage.getTarget(), fileInformationOut.toString(), Protocol.ACTION_FILE_PART);
+                    DataPackage dataPackageSend = new DataPackage(dataPackage.getSource(), dataPackage.getTarget(), fileInformationOut.toString(), Protocol.ACTION_FILE_PART, fileInformationOut.dataPart);
                     notifyEventProcessPackage(dataPackageSend);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
